@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Drawing App</title>
+  <meta charset="UTF-8">
+  <style>
+    body { background: #25292f; display: flex; flex-direction: column; align-items: center; }
+    h2 { color: #fff; margin-top: 28px; margin-bottom: 10px; }
+    .tip { color: #bbb; margin-bottom: 8px; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn, .color, .range {
+      font-weight: bold;
+      font-size: 1.1em;
+      border: none;
+      border-radius: 7px;
+      padding: 6px 14px;
+      margin: 0 2px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #0003;
+      background: #2b72ff; color: #fff;
+      transition: background 0.2s;
+    }
+    .btn:active, .color.active { background: #1655a2; }
+    .color {
+      width: 28px; height: 28px;
+      padding: 0; border: 2px solid #fff;
+      border-radius: 50%;
+      margin-top: 2px;
+      background: currentColor;
+      color: inherit;
+    }
+    .color.selected { border: 2px solid #2b72ff; }
+    .range { width: 60px; padding: 0; }
+    canvas {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px #0005;
+      cursor: crosshair;
+      touch-action: none;
+      margin-bottom: 18px;
+      transition: box-shadow 0.15s;
+    }
+  </style>
+</head>
+<body>
+  <h2>Simple Drawing App</h2>
+  <div class="tip">Drag to draw / 指でも描けます</div>
+  <div class="toolbar">
+    <button class="btn" id="undoBtn">Undo</button>
+    <button class="btn" id="clearBtn">Clear</button>
+    <button class="btn" id="saveBtn">Save</button>
+    <button class="btn" id="eraserBtn">Eraser</button>
+    <label style="color:#fff; margin-left:8px;">Color:</label>
+    <button class="color selected" style="color:#2b72ff;" data-color="#2b72ff"></button>
+    <button class="color" style="color:#fa5252;" data-color="#fa5252"></button>
+    <button class="color" style="color:#16c784;" data-color="#16c784"></button>
+    <button class="color" style="color:#f1c40f;" data-color="#f1c40f"></button>
+    <button class="color" style="color:#222;" data-color="#222"></button>
+    <label style="color:#fff; margin-left:8px;">Width:</label>
+    <input type="range" min="2" max="12" value="3" id="widthRange" class="range">
+  </div>
+  <canvas id="drawCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById('drawCanvas');
+    canvas.width = window.innerWidth; // ウィンドウの幅を設定
+    canvas.height = window.innerHeight; // ウィンドウの高さを設定
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let last = {x: 0, y: 0};
+    let history = [];
+    let isRestoring = false;
+    let color = '#2b72ff';
+    let lineWidth = 3;
+    let erasing = false;
+    const colors = Array.from(document.querySelectorAll('.color'));
+
+    function getPos(e) {
+      if (e.touches) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top
+        };
+      }
+      return { x: e.offsetX, y: e.offsetY };
+    }
+    function saveHistory() {
+      if (!isRestoring) {
+        if (history.length > 20) history.shift();
+        history.push(canvas.toDataURL());
+      }
+    }
+    function start(e) {
+      drawing = true;
+      last = getPos(e);
+      saveHistory();
+      e.preventDefault();
+    }
+    function move(e) {
+      if (!drawing) return;
+      const pos = getPos(e);
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = erasing ? '#fff' : color;
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      last = pos;
+      e.preventDefault();
+    }
+    function end(e) { drawing = false; e.preventDefault(); }
+
+    document.getElementById('undoBtn').onclick = function() {
+      if (history.length === 0) return;
+      isRestoring = true;
+      const img = new window.Image();
+      img.onload = function() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        isRestoring = false;
+      };
+      img.src = history.pop();
+    };
+    document.getElementById('clearBtn').onclick = function() {
+      saveHistory();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+    document.getElementById('saveBtn').onclick = function() {
+      const link = document.createElement('a');
+      link.download = 'drawing.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    };
+    document.getElementById('eraserBtn').onclick = function() {
+      erasing = !erasing;
+      this.style.background = erasing ? '#fa5252' : '#2b72ff';
+    };
+    // Color selection
+    colors.forEach(btn => {
+      btn.onclick = function() {
+        if (erasing) return;
+        color = this.dataset.color;
+        colors.forEach(b => b.classList.remove('selected'));
+        this.classList.add('selected');
+      };
+    });
+    // Width range
+    document.getElementById('widthRange').oninput = function() {
+      lineWidth = this.value;
+    };
+    // Drawing events
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+    // Touch events for mobile
+    canvas.addEventListener('touchstart', start);
+    canvas.addEventListener('touchmove', move);
+    canvas.addEventListener('touchend', end);
+    canvas.addEventListener('touchcancel', end);
+  </script>
+</body>
+</html>
